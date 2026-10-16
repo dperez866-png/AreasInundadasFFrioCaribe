@@ -4,7 +4,9 @@
 <title>Frente frío febrero 2026 · Áreas inundadas por municipio</title>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
-<style>#map{height:580px;border-radius:8px;z-index:0}.leaflet-container{font:12px system-ui}
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<style>@media print{#pdf{display:none}}#map{height:580px;border-radius:8px;z-index:0}.leaflet-container{font:12px system-ui}
 :root{box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);--bg:#f4f6f8;--card:#fff;--tx:#14202b;--mu:#5d6b78;--bd:#dde3e9;--ac:#0b6e99;--sea:#e8f1f6;--grid:#cfd9e1}
 @media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#0f1620;--card:#18222e;--tx:#e8eef3;--mu:#97a6b3;--bd:#2a3846;--ac:#4cb3de;--sea:#122231;--grid:#27394a}}
 :root[data-theme="dark"]{--bg:#0f1620;--card:#18222e;--tx:#e8eef3;--mu:#97a6b3;--bd:#2a3846;--ac:#4cb3de;--sea:#122231;--grid:#27394a}
@@ -37,9 +39,9 @@ th,td{padding:4px 8px;text-align:right;border-bottom:1px solid var(--bd);white-s
 <div class="ctl"><span>Departamentos:</span><span id="chips"></span>
 <label>Métrica <select id="metric"><option value="ai">Área inundada (ha)</option><option value="p">% del municipio inundado</option></select></label>
 <label>Mín. <select id="minv"></select></label>
-<input type="search" id="q" placeholder="Buscar municipio…"></div>
+<input type="search" id="q" placeholder="Buscar municipio…"><button class="chip on" id="pdf" data-html2canvas-ignore="true">⬇ Descargar PDF</button></div>
 <div class="grid">
-<div class="card"><h2>Mapa de afectación (elige el mapa base arriba a la derecha)</h2><div id="map"></div>
+<div class="card"><h2>Mapa de afectación sobre imagen satelital (Esri World Imagery)</h2><div id="map"></div>
 <div class="leg">menor <i></i> mayor</div>
 <div class="note">Posiciones municipales aproximadas; el archivo no incluye geometrías. Los mapas base requieren conexión a internet.</div></div>
 <div style="display:grid;gap:12px">
@@ -74,18 +76,11 @@ function render(){
  // mapa
  const mx=Math.max(...F.map(r=>r[met]),1e-9);
  if(!window.M){
-  const T=(u,o)=>L.tileLayer(u,Object.assign({maxZoom:18},o));
-  const B={'OpenStreetMap':T('https://tile.openstreetmap.org/{z}/{x}/{y}.png',{attribution:'© OpenStreetMap'}),
-  'Claro (CARTO)':T('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png',{attribution:'© OpenStreetMap © CARTO'}),
-  'Oscuro (CARTO)':T('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',{attribution:'© OpenStreetMap © CARTO'}),
-  'Satélite (Esri)':T('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',{attribution:'Esri, Maxar'}),
-  'Calles (Esri)':T('https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}',{attribution:'Esri'}),
-  'Topográfico (OpenTopoMap)':T('https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png',{maxZoom:17,attribution:'© OpenTopoMap'})};
   window.M=L.map('map',{preferCanvas:true}).fitBounds([[7.0,-77.4],[11.5,-72.6]]);
-  B['OpenStreetMap'].addTo(M);L.control.layers(B,null,{collapsed:false}).addTo(M);L.control.scale({imperial:false}).addTo(M);
+  L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',{maxZoom:18,crossOrigin:true,attribution:'Esri, Maxar, Earthstar Geographics'}).addTo(M);L.control.scale({imperial:false}).addTo(M);
   window.LG=L.layerGroup().addTo(M);
   const cen={};D.forEach(r=>{(cen[r.d]=cen[r.d]||[0,0,0]);cen[r.d][0]+=r.lat;cen[r.d][1]+=r.lon;cen[r.d][2]++});
-  deps.forEach(d=>{const c=cen[d];L.marker([c[0]/c[2],c[1]/c[2]],{interactive:false,icon:L.divIcon({className:'',html:`<div style="font-weight:700;font-size:11px;color:#111;text-shadow:0 0 3px #fff,0 0 3px #fff;white-space:nowrap;transform:translate(-50%,-34px)">${d.toUpperCase()}</div>`})}).addTo(M)});
+  deps.forEach(d=>{const c=cen[d];L.marker([c[0]/c[2],c[1]/c[2]],{interactive:false,icon:L.divIcon({className:'',html:`<div style="font-weight:700;font-size:11px;color:#fff;text-shadow:0 0 3px #000,0 0 3px #000;white-space:nowrap;transform:translate(-50%,-34px)">${d.toUpperCase()}</div>`})}).addTo(M)});
  }
  LG.clearLayers();
  [...F].sort((a,b)=>b[met]-a[met]).forEach(r=>L.circleMarker([r.lat,r.lon],{radius:3+Math.sqrt(r[met]/mx)*24,color:'#fff',weight:.8,fillColor:color(r[met],mx),fillOpacity:.8}).bindTooltip(info(r)).addTo(LG));
@@ -110,5 +105,13 @@ function render(){
 }
 $('tb').onclick=e=>{const k=e.target.dataset.s;if(!k)return;sortD=sortK==k?-sortD:-1;sortK=k;render()};
 document.addEventListener('mousemove',e=>{const b=e.target.closest&&e.target.closest('[data-k]');tip(e,b?info(D[+b.dataset.k]):null)});
+$('pdf').onclick=async()=>{const b=$('pdf');b.textContent='Generando PDF…';
+ try{await new Promise(r=>setTimeout(r,250));
+  const c=await html2canvas(document.body,{useCORS:true,scale:1.5,backgroundColor:getComputedStyle(document.body).backgroundColor,ignoreElements:e=>e.id=='tip'});
+  const pdf=new window.jspdf.jsPDF('p','mm','a4'),m=8,iw=210-2*m,sh=297-2*m,sp=Math.floor(sh*c.width/iw);
+  for(let y=0,p=0;y<c.height;y+=sp,p++){const s=document.createElement('canvas');s.width=c.width;s.height=Math.min(sp,c.height-y);s.getContext('2d').drawImage(c,0,y,c.width,s.height,0,0,c.width,s.height);if(p)pdf.addPage();pdf.addImage(s.toDataURL('image/jpeg',.92),'JPEG',m,m,iw,s.height*iw/c.width)}
+  pdf.save('dashboard_inundaciones_'+new Date().toISOString().slice(0,10)+'.pdf');
+ }catch(e){console.error(e);alert('No se pudo generar el PDF directamente. Se abrirá la impresión: elige "Guardar como PDF".');window.print()}
+ b.textContent='⬇ Descargar PDF'};
 render();
 </script></body></html>
